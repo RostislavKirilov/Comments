@@ -1,0 +1,39 @@
+version: '3.9'
+
+services:
+  hoteldb:
+    image: postgres
+    networks:
+      - hotel
+    ports:
+      - "5432:5432"
+    volumes:
+      - hoteldb:/var/lib/postgresql/data
+      - ./create_db.sh:/docker-entrypoint-initdb.d/create_db.sh
+    environment:
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_USER=user
+      - POSTGRES_DB=hotel
+
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4
+    networks:
+      - hotel
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin_not_used@user.com
+      PGADMIN_DEFAULT_PASSWORD: admin_not_used
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "5050:80"
+    restart: always
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+networks:
+  hotel:
+
+volumes:
+  hoteldb:
+  pgadmin_data:

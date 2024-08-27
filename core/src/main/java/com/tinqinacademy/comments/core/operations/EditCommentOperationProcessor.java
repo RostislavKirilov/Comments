@@ -39,25 +39,34 @@ public class EditCommentOperationProcessor extends BaseOperation implements Edit
     @Override
     public Either<Errors, EditCommentOutput> process(EditCommentInput input) {
         return Try.of(() -> {
-                    log.info("Start editing comment with input: {}", input);
+                    log.info("Start editing comment with ID: {}", input.getCommentId());
+
+                    // Validate the input
                     validate(input);
 
+                    // Find the comment by its ID
                     CommentEntity commentEntity = commentRepository.findById(UUID.fromString(input.getCommentId()))
                             .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
 
-                    commentEntity.setComment(input.getContent());
-                    commentEntity.setRoomId(input.getRoomId());
+                    // Update the content if provided
+                    if (input.getContent() != null && !input.getContent().isEmpty()) {
+                        commentEntity.setComment(input.getContent());
+                    }
+
+                    // Update the last edit time
                     commentEntity.setLastEditTime(LocalDateTime.now());
 
+                    // Save the updated comment
                     commentRepository.save(commentEntity);
 
+                    // Prepare the output
                     EditCommentOutput output = EditCommentOutput.builder()
-                            .commentId(input.getCommentId())
+                            .commentId(commentEntity.getId().toString())
                             .content(commentEntity.getComment())
-                            .roomId(commentEntity.getRoomId())
+                            .roomId(commentEntity.getRoomId().toString())
                             .build();
 
-                    log.info("End editing comment with output: {}", output);
+                    log.info("End editing comment with ID: {}", input.getCommentId());
                     return output;
                 })
                 .toEither()
@@ -73,11 +82,24 @@ public class EditCommentOperationProcessor extends BaseOperation implements Edit
     }
 
     private ErrorOutput matchError(Throwable throwable) {
-        return io.vavr.API.Match(throwable).of(
-                io.vavr.API.Case(io.vavr.API.$(IllegalArgumentException.class::isInstance),
-                        new ErrorOutput(List.of(Errors.of(exceptionMessages.getCommentNotFound())), HttpStatus.BAD_REQUEST)),
-                io.vavr.API.Case(io.vavr.API.$(),
-                        new ErrorOutput(List.of(Errors.of(exceptionMessages.getRoomNotFound())), HttpStatus.INTERNAL_SERVER_ERROR))
-        );
+        if (throwable instanceof IllegalArgumentException) {
+            String message = throwable.getMessage();
+            if (message != null && message.contains("Comment not found")) {
+                return new ErrorOutput(List.of(new Errors(message)), HttpStatus.NOT_FOUND);
+            }
+            return new ErrorOutput(List.of(new Errors(message)), HttpStatus.BAD_REQUEST);
+        }
+        return new ErrorOutput(List.of(new Errors("An unexpected error occurred")), HttpStatus.INTERNAL_SERVER_ERROR);
     }
+
+
+
+
+
+    private void validate(EditCommentInput input) {
+        if (input.getContent() != null && input.getContent().length() > 1000) {
+            throw new IllegalArgumentException("Content must be less than or equal to 1000 characters");
+        }
+    }
+
 }

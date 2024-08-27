@@ -1,6 +1,7 @@
 package com.tinqinacademy.comments.core.operations;
 
 import com.tinqinacademy.comments.api.base.BaseOperation;
+import com.tinqinacademy.comments.api.contracts.operations.getallcomments.CommentOutput;
 import com.tinqinacademy.comments.api.contracts.operations.getallcomments.GetCommentsInput;
 import com.tinqinacademy.comments.api.contracts.operations.getallcomments.GetCommentsOperation;
 import com.tinqinacademy.comments.api.contracts.operations.getallcomments.GetCommentsOutput;
@@ -20,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,32 +39,28 @@ public class GetCommentsOperationProcessor extends BaseOperation implements GetC
         this.exceptionMessages = exceptionMessages;
     }
 
+
     @Override
     public Either<Errors, GetCommentsOutput> process(GetCommentsInput input) {
         return Try.of(() -> {
-                    log.info("Start getting comments with input: {}", input);
+                    // Валидиране на входните данни
                     validate(input);
 
-                    List<CommentEntity> comments = commentRepository.findByRoomId(input.getRoomId());
+                    List<CommentEntity> commentEntities = commentRepository.findByRoomId(UUID.fromString(input.getRoomId()));
 
-                    if (comments.isEmpty()) {
-                        throw new IllegalArgumentException("No comments found for the given room ID");
-                    }
-
-                    List<GetCommentsOutput> output = comments.stream()
-                            .map(comment -> GetCommentsOutput.builder()
-                                    .roomId(comment.getRoomId())
-                                    .comment(comment.getComment())
-                                    .publishDate(comment.getPublishedDate())
-                                    .lastEditTime(comment.getLastEditTime())
-                                    .editedBy(comment.getEditedBy())
-                                    .name(comment.getFirstName() + " " + comment.getLastName())
+                    List<CommentOutput> comments = commentEntities.stream()
+                            .map(entity -> CommentOutput.builder()
+                                    .roomId(entity.getRoomId().toString())
+                                    .comment(entity.getComment()) // Използвайте content ако е нужно
+                                    .publishDate(entity.getPublishedDate())
+                                    .lastEditTime(entity.getLastEditTime())
+                                    .editedBy(entity.getEditedBy())
+                                    .name(entity.getFirstName() + " " + entity.getLastName()) // Комбинирайте първо и последно име
                                     .build())
                             .collect(Collectors.toList());
 
-                    log.info("End getting comments with output: {}", output);
                     return GetCommentsOutput.builder()
-                            .comments(output)
+                            .comments(comments)
                             .build();
                 })
                 .toEither()
@@ -70,19 +68,7 @@ public class GetCommentsOperationProcessor extends BaseOperation implements GetC
     }
 
     private Errors handleErrors(Throwable throwable) {
-        ErrorOutput errorOutput = matchError(throwable);
-        return Errors.builder()
-                .errors(List.of(new Error(errorOutput.getMessage())))
-                .message(errorOutput.getMessage())
-                .build();
-    }
-
-    private ErrorOutput matchError(Throwable throwable) {
-        return io.vavr.API.Match(throwable).of(
-                io.vavr.API.Case(io.vavr.API.$(IllegalArgumentException.class::isInstance),
-                        new ErrorOutput(List.of(Errors.of(exceptionMessages.getCommentNotFound())), HttpStatus.BAD_REQUEST)),
-                io.vavr.API.Case(io.vavr.API.$(),
-                        new ErrorOutput(List.of(Errors.of(exceptionMessages.getRoomNotFound())), HttpStatus.INTERNAL_SERVER_ERROR))
-        );
+        // Обработка на грешки с ErrorMapper
+        return errorMapper.map(throwable, HttpStatus.BAD_REQUEST).getErrors().get(0);
     }
 }

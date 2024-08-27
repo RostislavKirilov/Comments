@@ -17,11 +17,19 @@ public class Errors {
 
     private String message;
     private String field;
+    private int httpStatusCode;
+
 
     public Errors ( String unexpectedError ) {
         this.message = unexpectedError;
         this.errors = List.of();
     }
+
+    public Errors(String message, int httpStatusCode) {
+        this.message = message;
+        this.httpStatusCode = httpStatusCode;
+    }
+
 
     public String getMessage() {
         if (errors == null || errors.isEmpty()) {

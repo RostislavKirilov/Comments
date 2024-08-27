@@ -38,48 +38,29 @@ public class AdminDeleteOperationProcessor extends BaseOperation implements Admi
 
     @Override
     public Either<Errors, AdminDeleteOutput> process(AdminDeleteInput input) {
-        return Try.of(() -> {
-                    log.info("Start deleting comment with input: {}", input);
-                    validate(input);
+        UUID commentIdUUID;
 
-                    UUID commentUUID = UUID.fromString(input.getCommentId());
-                    Optional<CommentEntity> commentOptional = commentRepository.findById(commentUUID);
+        try {
+            commentIdUUID = UUID.fromString(input.getCommentId());
+        } catch (IllegalArgumentException e) {
+            return Either.left(new Errors("Invalid ID format!", HttpStatus.BAD_REQUEST.value()));
+        }
 
-                    if (commentOptional.isEmpty()) {
-                        throw new IllegalArgumentException(exceptionMessages.getCommentNotFound());
-                    }
+        Optional<CommentEntity> commentEntityOptional = commentRepository.findById(commentIdUUID);
 
-                    CommentEntity comment = commentOptional.get();
-                    if (!comment.getRoomId().equals(input.getRoomId())) {
-                        throw new IllegalArgumentException(exceptionMessages.getRoomNotFound());
-                    }
+        if (commentEntityOptional.isEmpty()) {
+            return Either.left(new Errors("Comment not found!", HttpStatus.NOT_FOUND.value()));
+        }
 
-                    commentRepository.delete(comment);
-                    AdminDeleteOutput output = AdminDeleteOutput.builder()
-                            .commentId(input.getCommentId())
-                            .message("Comment successfully deleted!")
-                            .build();
+        CommentEntity commentEntity = commentEntityOptional.get();
+        commentRepository.delete(commentEntity);
 
-                    log.info("End deleting comment with output: {}", output);
-                    return output;
-                })
-                .toEither()
-                .mapLeft(this::handleErrors);
+        AdminDeleteOutput output = AdminDeleteOutput.builder()
+                .commentId(input.getCommentId())
+                .message("Comment successfully deleted!")
+                .build();
+
+        return Either.right(output);
     }
 
-    private Errors handleErrors(Throwable throwable) {
-        ErrorOutput errorOutput = matchError(throwable);
-        return new Errors(List.of(Error.builder()
-                .message(errorOutput.getMessage())
-                .build()).toString());
-    }
-
-    private ErrorOutput matchError(Throwable throwable) {
-        return io.vavr.API.Match(throwable).of(
-                io.vavr.API.Case(io.vavr.API.$(IllegalArgumentException.class::isInstance),
-                        new ErrorOutput(List.of(Errors.of(exceptionMessages.getCommentNotFound())), HttpStatus.BAD_REQUEST)),
-                io.vavr.API.Case(io.vavr.API.$(),
-                        new ErrorOutput(List.of(Errors.of(exceptionMessages.getRoomNotFound())), HttpStatus.INTERNAL_SERVER_ERROR))
-        );
-    }
 }

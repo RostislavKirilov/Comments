@@ -23,7 +23,7 @@ public class CommentEntity {
     private UUID id;
 
     @Column(nullable = false)
-    private String roomId;
+    private UUID roomId;
 
     @Column(nullable = false)
     private String firstName;

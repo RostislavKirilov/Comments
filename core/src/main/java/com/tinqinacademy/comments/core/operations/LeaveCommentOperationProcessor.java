@@ -15,12 +15,14 @@ import io.vavr.control.Either;
 import io.vavr.control.Try;
 import jakarta.validation.Validator;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -42,7 +44,7 @@ public class LeaveCommentOperationProcessor extends BaseOperation implements Lea
                     validate(input);
 
                     CommentEntity commentEntity = CommentEntity.builder()
-                            .roomId(input.getRoomId())
+                            .roomId(UUID.fromString(input.getRoomId()))
                             .firstName(input.getFirstName())
                             .lastName(input.getLastName())
                             .comment(input.getComment())
@@ -52,7 +54,7 @@ public class LeaveCommentOperationProcessor extends BaseOperation implements Lea
                     commentRepository.save(commentEntity);
 
                     LeaveCommentOutput output = LeaveCommentOutput.builder()
-                            .roomId(commentEntity.getRoomId())
+                            .roomId(String.valueOf(commentEntity.getRoomId()))
                             .comment(commentEntity.getComment())
                             .publishedDate(commentEntity.getPublishedDate())
                             .build();

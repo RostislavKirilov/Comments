@@ -8,7 +8,7 @@
         <version>3.3.1</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
-    <groupId>com.tinqinacademy</groupId>
+    <groupId>com.tinqinacademy.comments</groupId>
     <artifactId>comments</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
@@ -27,6 +27,7 @@
         <module>domain</module>
         <module>api</module>
         <module>persistence</module>
+        <module>restexport</module>
     </modules>
     <scm>
         <connection/>
@@ -47,6 +48,17 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
+        </dependency>
+
+
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
         <dependency>

@@ -1,18 +1,19 @@
 package com.tinqinacademy.comments.rest.controllers;
 
 import com.tinqinacademy.comments.api.contracts.operations.admindelete.AdminDeleteInput;
-import com.tinqinacademy.comments.api.contracts.operations.admindelete.AdminDeleteOperation;
 import com.tinqinacademy.comments.api.contracts.operations.admindelete.AdminDeleteOutput;
 import com.tinqinacademy.comments.api.contracts.operations.adminedit.AdminEditInput;
-import com.tinqinacademy.comments.api.contracts.operations.adminedit.AdminEditOperation;
 import com.tinqinacademy.comments.api.contracts.operations.adminedit.AdminEditOutput;
-import com.tinqinacademy.comments.api.contracts.RestApiRoutes;
+import com.tinqinacademy.comments.api.contracts.routes.RestApiRoutesComments;
 import com.tinqinacademy.comments.api.errors.Errors;
+import com.tinqinacademy.comments.core.operations.AdminDeleteOperationProcessor;
+import com.tinqinacademy.comments.core.operations.AdminEditOperationProcessor;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.vavr.control.Either;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,57 +21,54 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @AllArgsConstructor
 @ControllerAdvice
+@Slf4j
 public class AdminController {
 
-   private final AdminDeleteOperation adminDeleteOperation;
-   private final AdminEditOperation adminEditOperation;
+   private final AdminDeleteOperationProcessor adminDeleteOperationProcessor;
+   private final AdminEditOperationProcessor adminEditOperationProcessor;
 
 
-    @PatchMapping(RestApiRoutes.ADMIN_EDIT)
-    @Operation(summary = "Admin can edit any comment.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Comment successfully edited!"),
-            @ApiResponse(responseCode = "400", description = "Invalid input data"),
-            @ApiResponse(responseCode = "404", description = "Comment not found!"),
-            @ApiResponse(responseCode = "500", description = "Internal server error")
-    })
-    public ResponseEntity<AdminEditOutput> adminEdit(@RequestBody AdminEditInput adminEditInput) {
-        Either<Errors, AdminEditOutput> result = adminEditOperation.process(adminEditInput);
+    @PatchMapping(RestApiRoutesComments.ADMIN_EDIT)
+    public ResponseEntity<?> editComment(@PathVariable("commentId") String commentId, @RequestBody AdminEditInput input) {
+        input.setCommentId(commentId);
 
-        if (result.isRight()) {
-            AdminEditOutput output = result.get();
-            return ResponseEntity.ok(output);
-        } else {
-            Errors errors = result.getLeft();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(AdminEditOutput.builder()
-                            .commentId(adminEditInput.getCommentId())
-                            .message(errors.getMessage())
-                            .build());
-        }
+        Either<Errors, AdminEditOutput> result = adminEditOperationProcessor.process(input);
+
+        return result.fold(
+                error -> ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error),
+                ResponseEntity::ok
+        );
     }
 
-    @DeleteMapping(RestApiRoutes.ADMIN_DELETE)
-    @Operation(summary = "Admin can delete any comment for a certain room.")
+    @DeleteMapping(RestApiRoutesComments.ADMIN_DELETE)
+    @Operation(summary = "Admin can delete any comment.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Comment successfully deleted!"),
-            @ApiResponse(responseCode = "400", description = "Invalid input data"),
+            @ApiResponse(responseCode = "400", description = "Invalid ID format!"),
             @ApiResponse(responseCode = "404", description = "Comment not found!"),
             @ApiResponse(responseCode = "500", description = "Internal server error")
     })
-    public ResponseEntity<AdminDeleteOutput> adminDelete(
-            @RequestParam String commentId,
-            @RequestParam String roomId) {
-        AdminDeleteInput input = new AdminDeleteInput(commentId, roomId);
-        Either<Errors, AdminDeleteOutput> result = adminDeleteOperation.process(input);
+    public ResponseEntity<AdminDeleteOutput> deleteComment(@PathVariable String commentId) {
+        log.info("Received request to delete comment with ID: {}", commentId);
 
-        if (result.isRight()) {
-            AdminDeleteOutput output = result.get();
-            return ResponseEntity.ok(output);
-        } else {
-            Errors errors = result.getLeft();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(new AdminDeleteOutput(commentId, errors.getMessage()));
-        }
+        AdminDeleteInput input = AdminDeleteInput.builder()
+                .commentId(commentId)
+                .build();
+
+        Either<Errors, AdminDeleteOutput> result = adminDeleteOperationProcessor.process(input);
+
+        return result.fold(
+                error -> {
+                    log.error("Error during delete operation: {}", error.getMessage());
+                    HttpStatus status = error.getHttpStatusCode() == HttpStatus.NOT_FOUND.value() ? HttpStatus.NOT_FOUND : HttpStatus.BAD_REQUEST;
+                    return ResponseEntity.status(status)
+                            .body(new AdminDeleteOutput(commentId, error.getMessage()));
+                },
+                response -> {
+                    log.info("Successfully deleted comment with ID: {}", commentId);
+                    return ResponseEntity.ok(response);
+                }
+        );
     }
+
 }

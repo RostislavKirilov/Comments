@@ -13,14 +13,6 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 public class GetCommentsOutput implements OperationOutput {
-
-    private String roomId;
-    private String comment;
-    private LocalDateTime publishDate;
-    private LocalDateTime lastEditTime;
-    private String editedBy;
-    private String name;
-    private List<GetCommentsOutput> comments;
-
+    private List<CommentOutput> comments;
 
 }

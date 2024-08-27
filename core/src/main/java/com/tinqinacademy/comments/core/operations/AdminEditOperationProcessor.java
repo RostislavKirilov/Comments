@@ -3,9 +3,7 @@ import com.tinqinacademy.comments.api.base.BaseOperation;
 import com.tinqinacademy.comments.api.contracts.operations.adminedit.AdminEditInput;
 import com.tinqinacademy.comments.api.contracts.operations.adminedit.AdminEditOperation;
 import com.tinqinacademy.comments.api.contracts.operations.adminedit.AdminEditOutput;
-import com.tinqinacademy.comments.api.errors.Error;
 import com.tinqinacademy.comments.api.errors.ErrorMapper;
-import com.tinqinacademy.comments.api.errors.ErrorOutput;
 import com.tinqinacademy.comments.api.errors.Errors;
 import com.tinqinacademy.comments.api.messages.ExceptionMessages;
 import com.tinqinacademy.comments.persistence.entities.CommentEntity;
@@ -18,7 +16,6 @@ import org.springframework.core.convert.ConversionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,58 +25,51 @@ public class AdminEditOperationProcessor extends BaseOperation implements AdminE
 
     private final CommentRepository commentRepository;
     private final ExceptionMessages exceptionMessages;
+    private final ErrorMapper errorMapper;
 
-    public AdminEditOperationProcessor( Validator validator, ConversionService conversionService, ErrorMapper errorMapper, CommentRepository commentRepository, ExceptionMessages exceptionMessages ) {
+    public AdminEditOperationProcessor( Validator validator, ConversionService conversionService, ErrorMapper errorMapper, CommentRepository commentRepository, ExceptionMessages exceptionMessages, ErrorMapper errorMapper1 ) {
         super(validator, conversionService, errorMapper);
         this.commentRepository = commentRepository;
         this.exceptionMessages = exceptionMessages;
+        this.errorMapper = errorMapper1;
     }
 
     @Override
     public Either<Errors, AdminEditOutput> process(AdminEditInput input) {
-        return Try.of(() -> {
-                    log.info("Start editing comment with input: {}", input);
-                    validate(input);
+        try {
+            // Validate input (ensure 'commentId' is valid UUID)
+            validate(input);
 
-                    UUID commentUUID = UUID.fromString(input.getCommentId());
-                    Optional<CommentEntity> commentOptional = commentRepository.findById(commentUUID);
+            UUID commentId = UUID.fromString(input.getCommentId());
 
-                    if (commentOptional.isEmpty()) {
-                        throw new IllegalArgumentException("Comment not found!");
-                    }
+            // Find the comment
+            Optional<CommentEntity> optionalComment = commentRepository.findById(commentId);
+            if (optionalComment.isEmpty()) {
+                throw new IllegalArgumentException("Comment not found.");
+            }
 
-                    CommentEntity comment = commentOptional.get();
-                    comment.setRoomId(input.getRoomNo());
-                    comment.setFirstName(input.getFirstName());
-                    comment.setLastName(input.getLastName());
-                    comment.setContent(input.getContent());
-                    commentRepository.save(comment);
+            // Update the comment
+            CommentEntity commentEntity = optionalComment.get();
+            commentEntity.setContent(input.getContent());
+            // Other updates if needed
+            commentRepository.save(commentEntity);
 
-                    AdminEditOutput output = AdminEditOutput.builder()
-                            .commentId(input.getCommentId())
-                            .message("Comment successfully edited!")
-                            .build();
-
-                    log.info("End editing comment with output: {}", output);
-                    return output;
-                })
-                .toEither()
-                .mapLeft(this::handleErrors);
+            return Either.right(AdminEditOutput.builder()
+                    .commentId(input.getCommentId())
+                    .message("Comment updated successfully.")
+                    .build());
+        } catch (IllegalArgumentException e) {
+            // Handle errors
+            return Either.left(new Errors(e.getMessage(), HttpStatus.BAD_REQUEST.value()));
+        } catch (Exception e) {
+            // General error handling
+            return Either.left(new Errors("An unexpected error occurred.", HttpStatus.INTERNAL_SERVER_ERROR.value()));
+        }
     }
+
 
     private Errors handleErrors(Throwable throwable) {
-        ErrorOutput errorOutput = matchError(throwable);
-        return new Errors(List.of(Error.builder()
-                .message(errorOutput.getMessage())
-                .build()).toString());
-    }
-
-    private ErrorOutput matchError(Throwable throwable) {
-        return io.vavr.API.Match(throwable).of(
-                io.vavr.API.Case(io.vavr.API.$(IllegalArgumentException.class::isInstance),
-                        new ErrorOutput(List.of(Errors.of(exceptionMessages.getCommentNotFound())), HttpStatus.BAD_REQUEST)),
-                io.vavr.API.Case(io.vavr.API.$(),
-                        new ErrorOutput(List.of(Errors.of(exceptionMessages.getRoomNotFound())), HttpStatus.INTERNAL_SERVER_ERROR))
-        );
+        // Обработка на грешки с ErrorMapper
+        return errorMapper.map(throwable, HttpStatus.BAD_REQUEST).getErrors().get(0);
     }
 }

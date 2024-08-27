@@ -6,7 +6,6 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
 @Getter
-@Setter
 @Builder
 @ToString
 @AllArgsConstructor
@@ -23,8 +22,4 @@ public class LeaveCommentInput implements OperationInput {
     private String lastName;
     @NotBlank(message = "Please, enter your comment!")
     private String comment;
-
-
-
-
 }

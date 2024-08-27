@@ -1,5 +1,6 @@
 package com.tinqinacademy.comments.api.contracts.operations.admindelete;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.tinqinacademy.comments.api.base.OperationInput;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
@@ -12,7 +13,7 @@ import lombok.*;
 @ToString
 public class AdminDeleteInput implements OperationInput {
 
-    @NotBlank(message = "Fill the room ID!")
+    @JsonIgnore
     private String roomId;
     @NotBlank(message = "Fill the commend ID")
     private String commentId;
